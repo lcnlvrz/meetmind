@@ -35,6 +35,7 @@ export class IacStack extends cdk.Stack {
         GROQ_API_KEY: process.env.GROQ_API_KEY!,
         TURSO_DATABASE_URL: process.env.TURSO_DATABASE_URL!,
         TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN!,
+        GOOGLE_API_KEY: process.env.GOOGLE_API_KEY!,
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
     })
