@@ -5,7 +5,7 @@ import {
   DatabaseClient,
   InsertMeeting,
   meetingTable,
-} from '@meetmind/db'
+} from 'db'
 import { generateObject } from 'ai'
 import type { S3Event, SQSEvent } from 'aws-lambda'
 import ffmpeg from 'fluent-ffmpeg'

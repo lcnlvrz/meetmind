@@ -16,7 +16,7 @@
     "@aws-sdk/client-lambda": "^3.750.0",
     "@aws-sdk/client-s3": "^3.750.0",
     "@libsql/client": "^0.14.0",
-    "@meetmind/db": "*",
+    "db": "*",
     "ai": "^4.1.45",
     "dotenv": "^16.4.7",
     "fluent-ffmpeg": "^2.1.3",

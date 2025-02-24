@@ -16,8 +16,17 @@ export class IacStack extends cdk.Stack {
       bucketName: 'meetmind-meetings',
     })
 
+    const dlq = new sqs.Queue(this, 'dlq-meetmind-meetings-queue', {
+      queueName: 'dlq-meetmind-meetings-queue',
+    })
+
     const meetingsQueue = new sqs.Queue(this, 'meetmind-meetings-queue', {
       queueName: 'meetmind-meetings-queue',
+      visibilityTimeout: cdk.Duration.minutes(30),
+      deadLetterQueue: {
+        queue: dlq,
+        maxReceiveCount: 3,
+      },
     })
 
     meetingsBucket.addEventNotification(
@@ -38,6 +47,8 @@ export class IacStack extends cdk.Stack {
         GOOGLE_API_KEY: process.env.GOOGLE_API_KEY!,
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
+      memorySize: 2048,
+      timeout: cdk.Duration.minutes(5),
     })
 
     workerFunction.addEventSource(new lambda.SqsEventSource(meetingsQueue))

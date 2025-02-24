@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { PaginationDynamic } from '@/components/ui/pagination'
 import { msToMinutes } from '@/lib/utils'
-import { Meeting } from '@meetmind/db'
+import { Meeting } from 'db'
 import { ColumnDef } from '@tanstack/react-table'
 import { MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'

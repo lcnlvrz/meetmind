@@ -1,6 +1,6 @@
 import { and, count, eq, gte, ilike, like, lte, SQL } from 'drizzle-orm'
 import { db } from './db'
-import { meetingTable } from '@meetmind/db'
+import { meetingTable } from 'db'
 import { MeetingsSearchParams } from './meetings/search-params'
 
 const getMeetingFilters = ({

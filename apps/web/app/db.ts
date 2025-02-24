@@ -1,4 +1,4 @@
-import { createDatabaseClient } from '@meetmind/db'
+import { createDatabaseClient } from 'db'
 
 export const db = createDatabaseClient({
   authToken: process.env.TURSO_AUTH_TOKEN! || 'sample',
