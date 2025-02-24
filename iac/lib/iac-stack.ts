@@ -25,10 +25,10 @@ export class IacStack extends cdk.Stack {
       new s3n.SqsDestination(meetingsQueue)
     )
 
-    const dockerfileDir = path.join(__dirname, '../../apps/worker')
-
     const workerFunction = new DockerImageFunction(this, 'meetmind-worker', {
-      code: DockerImageCode.fromImageAsset(dockerfileDir),
+      code: DockerImageCode.fromImageAsset(path.join(__dirname, '../../'), {
+        file: path.join(__dirname, '../../apps/worker/Dockerfile'),
+      }),
       functionName: 'meetmind-worker',
       environment: {
         GROQ_API_KEY: process.env.GROQ_API_KEY!,
