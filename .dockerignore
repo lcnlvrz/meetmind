@@ -1,0 +1,11 @@
+node_modules
+
+dist
+
+.turbo
+
+.git
+
+/node_modules
+
+/dist

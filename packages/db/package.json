@@ -1,0 +1,27 @@
+{
+  "name": "@meetmind/db",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:push": "drizzle-kit push",
+    "build": "tsup ./src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "drizzle-kit": "^0.30.4"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.39.3",
+    "tsup": "^8.3.6"
+  }
+}
