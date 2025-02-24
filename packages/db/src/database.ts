@@ -1,9 +1,18 @@
 import { drizzle } from 'drizzle-orm/libsql'
 import { createClient } from '@libsql/client'
 
-const turso = createClient({
-  url: process.env.TURSO_DATABASE_URL!,
-  authToken: process.env.TURSO_AUTH_TOKEN,
-})
+export interface DatabaseClientOpts {
+  url: string
+  authToken: string
+}
 
-export const db = drizzle(turso)
+export const createDatabaseClient = (opts: DatabaseClientOpts) => {
+  const turso = createClient({
+    url: opts.url,
+    authToken: opts.authToken,
+  })
+
+  return drizzle(turso)
+}
+
+export type DatabaseClient = Awaited<ReturnType<typeof createDatabaseClient>>
