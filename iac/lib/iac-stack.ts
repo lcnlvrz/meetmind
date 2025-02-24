@@ -26,8 +26,8 @@ export class IacStack extends cdk.Stack {
     )
 
     const workerFunction = new DockerImageFunction(this, 'meetmind-worker', {
-      code: DockerImageCode.fromImageAsset(path.join(__dirname, '../../'), {
-        file: path.join(__dirname, '../../apps/worker/Dockerfile'),
+      code: DockerImageCode.fromImageAsset(path.join(__dirname, '../..'), {
+        file: 'apps/worker/Dockerfile',
       }),
       functionName: 'meetmind-worker',
       environment: {
