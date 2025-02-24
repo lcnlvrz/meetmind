@@ -25,10 +25,7 @@ export class IacStack extends cdk.Stack {
       new s3n.SqsDestination(meetingsQueue)
     )
 
-    const dockerfileDir = path.join(
-      __dirname,
-      '../../../apps/worker/Dockerfile'
-    )
+    const dockerfileDir = path.join(__dirname, '../../apps/worker')
 
     const workerFunction = new DockerImageFunction(this, 'meetmind-worker', {
       code: DockerImageCode.fromImageAsset(dockerfileDir),
