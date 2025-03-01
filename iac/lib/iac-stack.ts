@@ -45,9 +45,11 @@ export class IacStack extends cdk.Stack {
         TURSO_DATABASE_URL: process.env.TURSO_DATABASE_URL!,
         TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN!,
         GOOGLE_API_KEY: process.env.GOOGLE_API_KEY!,
+        TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN!,
+        TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID!,
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
-      memorySize: 8192,
+      memorySize: 3008,
       timeout: cdk.Duration.minutes(15),
     })
 
