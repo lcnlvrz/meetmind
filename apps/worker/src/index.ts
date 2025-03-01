@@ -13,27 +13,33 @@ import * as fs from 'fs'
 import Groq from 'groq-sdk'
 import * as path from 'path'
 import { z } from 'zod'
+import pLimit from 'p-limit'
 
 const TEMP_DIR = '/tmp'
+
+const CHUNK_LENGTH_SEC = 600
+const OVERLAP_SEC = 10
 
 const measureOp = async <T extends any>(
   operationName: string,
   cb: () => Promise<T>
 ) => {
+  console.log(`${operationName} starting at ${new Date().toISOString()}`)
+
   const start = performance.now()
 
   const result = await cb()
 
   const end = performance.now()
 
-  console.log(`${operationName} took ${end - start}ms. Output: ${result}`)
+  console.log(
+    `${operationName} took ${end - start}ms. Output: ${JSON.stringify(result, null, 4)}`
+  )
 
   return result
 }
 
 export const handler = async (event: SQSEvent) => {
-  const { s3, transcriber, db, google } = bootstrapDependencies()
-
   const [record] = event.Records
 
   const s3Event: S3Event = JSON.parse(record.body)
@@ -43,37 +49,19 @@ export const handler = async (event: SQSEvent) => {
 
   const videoPath = path.join(TEMP_DIR, 'input.mp4')
 
-  await measureOp('processMeeting', async () => {
-    await measureOp('downloadFile', () =>
-      downloadFromS3(s3, {
-        bucket,
-        key,
-        filePath: videoPath,
-      })
-    )
+  const deps = bootstrapDependencies()
 
-    const audioPath = path.join(TEMP_DIR, 'output.flac')
+  await measureOp('downloadFile', () =>
+    downloadFromS3(deps.s3, {
+      bucket,
+      key,
+      filePath: videoPath,
+    })
+  )
 
-    const durationMs = await measureOp('extractAudio', () =>
-      extractAudio(videoPath, audioPath)
-    )
-
-    const transcription = await measureOp('transcribeAudio', () =>
-      transcribeAudio(transcriber, audioPath)
-    )
-
-    const { title, summary } = await measureOp('digestTranscription', () =>
-      digestTranscription(transcription, google)
-    )
-
-    await measureOp('saveMeeting', () =>
-      saveMeeting(db, {
-        title,
-        summary,
-        transcription,
-        duration_ms: durationMs,
-      })
-    )
+  await processMeeting({
+    ...deps,
+    videoPath,
   })
 
   return {
@@ -82,7 +70,56 @@ export const handler = async (event: SQSEvent) => {
   }
 }
 
-const bootstrapDependencies = () => {
+export const processMeeting = async ({
+  videoPath,
+  transcriber,
+  google,
+  db,
+}: {
+  videoPath: string
+} & ReturnType<typeof bootstrapDependencies>) => {
+  await measureOp('processMeeting', async () => {
+    const audioPath = path.join(TEMP_DIR, 'output.flac')
+
+    const { durationMs, chunks } = await measureOp('extractAudio', () =>
+      extractAudio(videoPath, audioPath)
+    )
+
+    const limit = pLimit(5)
+
+    const transcriptionResults = await Promise.all(
+      chunks.map((chunk, i) =>
+        limit(() =>
+          measureOp(`transcribeChunk${i + 1}`, async () => {
+            const result = await transcribeChunk(transcriber, chunk.path)
+            return { ...result, startMs: chunk.startMs }
+          })
+        )
+      )
+    )
+
+    const transcriptionText = transcriptionResults
+      .map((transcription) => transcription.text)
+      .join(' ')
+
+    const { title, summary } = await measureOp('digestTranscription', () =>
+      digestTranscription(transcriptionText, google)
+    )
+
+    await measureOp('saveMeeting', () =>
+      saveMeeting(db, {
+        title,
+        summary,
+        transcription: transcriptionText,
+        duration_ms: durationMs,
+      })
+    )
+
+    chunks.forEach((chunk) => fs.unlinkSync(chunk.path))
+  })
+}
+
+export const bootstrapDependencies = () => {
   const s3 = new S3Client({
     region: process.env.AWS_REGION,
   })
@@ -106,20 +143,6 @@ const bootstrapDependencies = () => {
     db,
     google,
   }
-}
-
-const transcribeAudio = async (client: Groq, audioPath: string) => {
-  const file = fs.createReadStream(audioPath)
-
-  const transcription = await client.audio.transcriptions.create({
-    file,
-    model: 'whisper-large-v3',
-    language: 'es',
-    response_format: 'verbose_json',
-    temperature: 0,
-  })
-
-  return transcription.text
 }
 
 const downloadFromS3 = async (
@@ -147,22 +170,95 @@ const downloadFromS3 = async (
 
 const extractAudio = (
   inputPath: string,
-  outputPath: string
-): Promise<number> => {
+  outputPath: string,
+  chunkLengthSec: number = CHUNK_LENGTH_SEC,
+  overlapSec: number = OVERLAP_SEC
+): Promise<{
+  durationMs: number
+  chunks: { path: string; startMs: number }[]
+}> => {
   return new Promise((resolve, reject) => {
-    let duration: number = 0
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) return reject(err)
 
-    ffmpeg(inputPath)
-      .toFormat('flac')
-      .audioCodec('flac')
-      .on('error', reject)
-      .on('codecData', (data) => {
-        duration = parseFloat(data.duration)
-      })
-      //@ts-ignore
-      .on('end', () => resolve(duration))
-      .save(outputPath)
+      const duration = metadata.format.duration! * 1000 // Convert to ms
+      const chunks: { path: string; startMs: number }[] = []
+
+      console.log(
+        `Extracting audio from ${inputPath} - Duration: ${duration}ms`
+      )
+
+      ffmpeg(inputPath)
+        .toFormat('flac')
+        .audioCodec('flac')
+        .audioFrequency(16000)
+        .audioChannels(1)
+        .on('error', reject)
+        .on('end', async () => {
+          const fileSizeInBytes = fs.statSync(outputPath).size
+          const fileSizeInMB = (fileSizeInBytes / (1024 * 1024)).toFixed(2)
+          console.log(
+            `Audio file size: ${fileSizeInMB} MB. Duration: ${duration}ms`
+          )
+
+          const chunkMs = chunkLengthSec * 1000
+          const overlapMs = overlapSec * 1000
+          const totalChunks = Math.ceil(duration / (chunkMs - overlapMs))
+
+          console.log('Going to create', totalChunks, 'audio chunks')
+
+          const splitterLimit = pLimit(5)
+
+          await Promise.all(
+            Array.from({ length: totalChunks }).map((_, i) =>
+              splitterLimit(async () => {
+                const startMs = i * (chunkMs - overlapMs)
+                const chunkPath = path.join(TEMP_DIR, `chunk_${i}.flac`)
+                chunks.push({ path: chunkPath, startMs })
+
+                console.log('Creating chunk', i, 'of', totalChunks)
+
+                await new Promise<void>((resolve) =>
+                  ffmpeg(outputPath)
+                    .setStartTime(startMs / 1000)
+                    .setDuration(chunkLengthSec)
+                    .output(chunkPath)
+                    .audioCodec('flac')
+                    .audioFrequency(16000)
+                    .audioChannels(1)
+                    .on('end', () => {
+                      console.log('Chunk', i, 'of', totalChunks, 'created')
+                      resolve()
+                    })
+                    .on('error', reject)
+                    .run()
+                )
+              })
+            )
+          )
+
+          resolve({ durationMs: duration, chunks })
+        })
+        .save(outputPath)
+    })
   })
+}
+
+const transcribeChunk = async (
+  client: Groq,
+  chunkPath: string
+): Promise<{ text: string; segments: any[] }> => {
+  const file = fs.createReadStream(chunkPath)
+
+  const transcription = await client.audio.transcriptions.create({
+    file,
+    model: 'whisper-large-v3-turbo',
+    response_format: 'verbose_json',
+    temperature: 0,
+  })
+
+  //@ts-ignore
+  return transcription
 }
 
 const digestTranscription = async (

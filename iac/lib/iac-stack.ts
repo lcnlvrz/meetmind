@@ -47,8 +47,8 @@ export class IacStack extends cdk.Stack {
         GOOGLE_API_KEY: process.env.GOOGLE_API_KEY!,
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
-      memorySize: 2048,
-      timeout: cdk.Duration.minutes(5),
+      memorySize: 8192,
+      timeout: cdk.Duration.minutes(15),
     })
 
     workerFunction.addEventSource(new lambda.SqsEventSource(meetingsQueue))

@@ -5,8 +5,12 @@ services:
     build:
       context: ../..
       dockerfile: ./apps/web/Dockerfile
+      args:
+        TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
+        TURSO_DATABASE_URL: ${TURSO_DATABASE_URL}
     ports:
       - '3003:3003'
     env_file:
       - .env.development
     command: npm run start
+    restart: always

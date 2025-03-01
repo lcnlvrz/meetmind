@@ -8,7 +8,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "docker:build": "docker build -t meetmind-worker -f ./apps/worker/Dockerfile .",
-    "start": "turbo run start"
+    "start": "turbo run start",
+    "web:build": "docker build --build-arg TURSO_AUTH_TOKEN=sample --build-arg TURSO_DATABASE_URL=file:./db.sqlite -t meetmind-web -f ./apps/web/Dockerfile ."
   },
   "devDependencies": {
     "prettier": "^3.5.0",
