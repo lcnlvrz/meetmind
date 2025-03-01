@@ -14,11 +14,15 @@ import Groq from 'groq-sdk'
 import * as path from 'path'
 import { z } from 'zod'
 import pLimit from 'p-limit'
+import TelegramBot from 'node-telegram-bot-api'
+import { serializeError } from 'serialize-error'
 
 const TEMP_DIR = '/tmp'
 
 const CHUNK_LENGTH_SEC = 600
 const OVERLAP_SEC = 10
+
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN!)
 
 const measureOp = async <T extends any>(
   operationName: string,
@@ -40,33 +44,42 @@ const measureOp = async <T extends any>(
 }
 
 export const handler = async (event: SQSEvent) => {
-  const [record] = event.Records
+  try {
+    const [record] = event.Records
 
-  const s3Event: S3Event = JSON.parse(record.body)
+    const s3Event: S3Event = JSON.parse(record.body)
 
-  const bucket = s3Event.Records[0].s3.bucket.name
-  const key = decodeURIComponent(s3Event.Records[0].s3.object.key)
+    const bucket = s3Event.Records[0].s3.bucket.name
+    const key = decodeURIComponent(s3Event.Records[0].s3.object.key)
 
-  const videoPath = path.join(TEMP_DIR, 'input.mp4')
+    const videoPath = path.join(TEMP_DIR, 'input.mp4')
 
-  const deps = bootstrapDependencies()
+    const deps = bootstrapDependencies()
 
-  await measureOp('downloadFile', () =>
-    downloadFromS3(deps.s3, {
-      bucket,
-      key,
-      filePath: videoPath,
+    await measureOp('downloadFile', () =>
+      downloadFromS3(deps.s3, {
+        bucket,
+        key,
+        filePath: videoPath,
+      })
+    )
+
+    await processMeeting({
+      ...deps,
+      videoPath,
     })
-  )
 
-  await processMeeting({
-    ...deps,
-    videoPath,
-  })
+    return {
+      statusCode: 200,
+      body: 'Audio extraction completed successfully',
+    }
+  } catch (err) {
+    await bot.sendMessage(
+      process.env.TELEGRAM_CHAT_ID!,
+      `Error processing meeting: ${JSON.stringify(serializeError(err), null, 4)}`
+    )
 
-  return {
-    statusCode: 200,
-    body: 'Audio extraction completed successfully',
+    throw err
   }
 }
 
@@ -280,3 +293,6 @@ const digestTranscription = async (
 const saveMeeting = async (db: DatabaseClient, meeting: InsertMeeting) => {
   await db.insert(meetingTable).values(meeting)
 }
+
+//@ts-ignore
+handler()
