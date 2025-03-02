@@ -8,7 +8,6 @@ import * as s3n from 'aws-cdk-lib/aws-s3-notifications'
 import * as lambda from 'aws-cdk-lib/aws-lambda-event-sources'
 import * as logs from 'aws-cdk-lib/aws-logs'
 
-//
 export class IacStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props)

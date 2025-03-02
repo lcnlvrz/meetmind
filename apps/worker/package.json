@@ -23,7 +23,7 @@
     "groq-sdk": "^0.15.0",
     "node-telegram-bot-api": "^0.66.0",
     "p-limit": "^6.2.0",
-    "serialize-error": "^12.0.0",
+    "serialize-error": "^8.1.0",
     "ts-node": "^10.9.2",
     "tsup": "^8.3.6",
     "vitest": "^3.0.6",
