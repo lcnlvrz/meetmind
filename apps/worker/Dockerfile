@@ -16,7 +16,8 @@ FROM public.ecr.aws/lambda/nodejs:22 AS runner
 COPY --from=installer /app/node_modules ${LAMBDA_TASK_ROOT}/node_modules
 COPY --from=installer /app/packages/db ${LAMBDA_TASK_ROOT}/node_modules/db
 COPY --from=installer /app/apps/worker/dist/index.js ${LAMBDA_TASK_ROOT}
-COPY --from=installer /app/apps/worker/node_modules/dotenv ${LAMBDA_TASK_ROOT}/node_modules/dotenv
+COPY --from=installer /app/apps/worker/node_modules ${LAMBDA_TASK_ROOT}/worker/node_modules
+RUN cp -r ${LAMBDA_TASK_ROOT}/worker/node_modules/. ${LAMBDA_TASK_ROOT}/node_modules/
 RUN dnf install wget tar xz -y
 RUN wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
 RUN tar -xvf ffmpeg-git-amd64-static.tar.xz
