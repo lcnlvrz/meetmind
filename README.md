@@ -1,84 +1,33 @@
-# Turborepo starter
+![Meetmind](./logo.png)
 
-This Turborepo starter is maintained by the Turborepo core team.
+# Meetmind
 
-## Using this example
+Supermemory for your meetings - transcribe all your meetings and have conversations with them later
 
-Run the following command:
+# Tech Stack
 
-```sh
-npx create-turbo@latest
-```
+- Gemini for QA
+- Whisper for transcription (groq API)
+- Sqlite for database (turso)
+- Nextjs with Typescript for the app framework
+- AWS S3, SQS, Lambda for meetings processing (worker)
+- s3s-fuse for sync in real time local folder meetings with s3 bucket
+- Shadcn for UI components & TailwindCSS for styling
 
-## What's inside?
+# Architecture
 
-This Turborepo includes the following packages/apps:
+Meetmind is heavily focused on AWS services. But if your cloud provider has some alternative to aws s3, sqs and lambda functions, you can port or replicate the same architecture
 
-### Apps and Packages
+![Meetmind](./diagram.png)
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+# Deployment
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+## Worker
 
-### Utilities
+Meetmind uses CDK to deploy worker infra. The infrastructure is defined in the `iac` folder. You can deploy the stack in your AWS account. There is a github action if you need some reference (`/.github/workflows/cdk-deploy.yaml`)
 
-This Turborepo has some additional tools already setup for you:
+## Meetmind Dashboard
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+You can deploy the nextjs app with any service that supports it (e.g: vercel, aws, etc)
 
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-pnpm build
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-pnpm dev
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turbo.build/repo/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-npx turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-npx turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turbo.build/repo/docs/core-concepts/monorepos/running-tasks)
-- [Caching](https://turbo.build/repo/docs/core-concepts/caching)
-- [Remote Caching](https://turbo.build/repo/docs/core-concepts/remote-caching)
-- [Filtering](https://turbo.build/repo/docs/core-concepts/monorepos/filtering)
-- [Configuration Options](https://turbo.build/repo/docs/reference/configuration)
-- [CLI Usage](https://turbo.build/repo/docs/reference/command-line-reference)
+Personally i run meetmind dashboard on my local raspberry pi 5 using docker. I expose it using Cloudflare tunnels with strong authentication. I heavily recommend this approach if you just need something very cheap and easy to deploy.
