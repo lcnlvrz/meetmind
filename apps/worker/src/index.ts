@@ -44,6 +44,8 @@ const measureOp = async <T extends any>(
 }
 
 export const handler = async (event: SQSEvent) => {
+  console.log('event', JSON.stringify(event, null, 4))
+
   try {
     const start = performance.now()
 
