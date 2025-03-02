@@ -45,6 +45,8 @@ const measureOp = async <T extends any>(
 
 export const handler = async (event: SQSEvent) => {
   try {
+    const start = performance.now()
+
     const [record] = event.Records
 
     const s3Event: S3Event = JSON.parse(record.body)
@@ -64,10 +66,17 @@ export const handler = async (event: SQSEvent) => {
       })
     )
 
-    await processMeeting({
+    const { title, summary } = await processMeeting({
       ...deps,
       videoPath,
     })
+
+    const end = performance.now()
+
+    await bot.sendMessage(
+      process.env.TELEGRAM_CHAT_ID!,
+      `Meeting ${key} processed successfully\nTitle: ${title}\nSummary: ${summary}\nTime taken: ${end - start}ms`
+    )
 
     return {
       statusCode: 200,
@@ -90,7 +99,7 @@ export const processMeeting = async ({
   db,
 }: {
   videoPath: string
-} & ReturnType<typeof bootstrapDependencies>) => {
+} & ReturnType<typeof bootstrapDependencies>) =>
   await measureOp('processMeeting', async () => {
     const audioPath = path.join(TEMP_DIR, 'output.flac')
 
@@ -129,8 +138,9 @@ export const processMeeting = async ({
     )
 
     chunks.forEach((chunk) => fs.unlinkSync(chunk.path))
+
+    return { title, summary }
   })
-}
 
 export const bootstrapDependencies = () => {
   const s3 = new S3Client({
