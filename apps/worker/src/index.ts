@@ -303,6 +303,3 @@ const digestTranscription = async (
 const saveMeeting = async (db: DatabaseClient, meeting: InsertMeeting) => {
   await db.insert(meetingTable).values(meeting)
 }
-
-//@ts-ignore
-handler()
