@@ -51,7 +51,11 @@ export const handler = async (event: SQSEvent) => {
 
     const [record] = event.Records
 
+    console.log('record', JSON.stringify(record, null, 4))
+
     const s3Event: S3Event = JSON.parse(record.body)
+
+    console.log('s3Event', JSON.stringify(s3Event, null, 4))
 
     const bucket = s3Event.Records[0].s3.bucket.name
     const key = decodeURIComponent(s3Event.Records[0].s3.object.key)
@@ -305,6 +309,3 @@ const digestTranscription = async (
 const saveMeeting = async (db: DatabaseClient, meeting: InsertMeeting) => {
   await db.insert(meetingTable).values(meeting)
 }
-
-//@ts-ignore
-handler()
