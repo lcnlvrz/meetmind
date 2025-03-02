@@ -22,5 +22,7 @@ RUN dnf install wget tar xz -y
 RUN wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
 RUN tar -xvf ffmpeg-git-amd64-static.tar.xz
 RUN cp ffmpeg-git-20240629-amd64-static/ffmpeg /usr/local/bin/ffmpeg
+RUN cp ffmpeg-git-20240629-amd64-static/ffprobe /usr/local/bin/ffprobe
 RUN chmod +x /usr/local/bin/ffmpeg
+RUN chmod +x /usr/local/bin/ffprobe
 CMD [ "index.handler" ]
