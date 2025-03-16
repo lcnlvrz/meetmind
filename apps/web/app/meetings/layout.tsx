@@ -1,3 +1,5 @@
+import { Logo } from '@/components/logo'
+
 export default function MeetingsLayout({
   children,
 }: {
@@ -5,11 +7,12 @@ export default function MeetingsLayout({
 }) {
   return (
     <>
-      <nav>
-        <p className='font-bold'>meetmind</p>
-        <span>supermemory for your meetings</span>
+      <nav className='w-full flex p-4'>
+        <div className='[&>svg]:h-14 [&>svg]:fill-white pl-1'>
+          <Logo />
+        </div>
       </nav>
-      <div>{children}</div>
+      <div className='p-6'>{children}</div>
     </>
   )
 }

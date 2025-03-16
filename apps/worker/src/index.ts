@@ -111,7 +111,7 @@ export const handler = async (event: SQSEvent) => {
     } catch (err) {
       await bot.sendMessage(
         process.env.TELEGRAM_CHAT_ID!,
-        `Error processing meeting: ${JSON.stringify(serializeError(err), null, 4)}`
+        `Error processing meeting ${key}: ${JSON.stringify(serializeError(err), null, 4)}`
       )
 
       throw err

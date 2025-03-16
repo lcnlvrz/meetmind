@@ -76,6 +76,8 @@ export const retrieveMeeting = async ({ meetingId }: { meetingId: number }) => {
 
   if (!meeting) return
 
+  console.log('filename', meeting.id)
+
   const command = new GetObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME!,
     Key: meeting.filename,

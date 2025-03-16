@@ -18,11 +18,11 @@ export default async function MeetingsPage({
   const data = await paginateMeetings(filters)
 
   return (
-    <div className='space-y-5 p-14'>
+    <div className='space-y-5'>
       <h2 className='text-2xl font-bold'>Meetings</h2>
       <MeetingsDataTable data={data} />
 
-      <footer className='pb-4 w-full flex items-center justify-center'>
+      <footer className='fixed bottom-5 w-full flex items-center justify-center'>
         <div className='flex flex-col text-center'>
           <p className='text-sm text-gray-500 font-semibold'>
             Made by{' '}
