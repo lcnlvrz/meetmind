@@ -50,9 +50,9 @@ export class IacStack extends cdk.Stack {
         TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID!,
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
-      memorySize: 3008,
+      memorySize: 8024,
       timeout: cdk.Duration.minutes(15),
-      ephemeralStorageSize: cdk.Size.mebibytes(3024),
+      ephemeralStorageSize: cdk.Size.mebibytes(4024),
     })
 
     workerFunction.addEventSource(new lambda.SqsEventSource(meetingsQueue))
