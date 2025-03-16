@@ -25,5 +25,12 @@ export default async function MeetingPage({
 
   if (!meeting) return notFound()
 
-  return <MeetingChat meeting={meeting} />
+  return (
+    <div className='flex flex-row'>
+      <div>
+        <video src={meeting.videoUrl} />
+      </div>
+      <MeetingChat meeting={meeting} />
+    </div>
+  )
 }

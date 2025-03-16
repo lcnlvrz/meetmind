@@ -2,6 +2,7 @@
 import { RetrieveMeetingResponseBody } from '@/app/actions'
 import { ChatMessageRequestBody } from '@/app/api/chat/route'
 import { Markdown } from '@/components/ui/markdown'
+import { Textarea } from '@/components/ui/textarea'
 import { msToMinutes } from '@/lib/utils'
 import { useChat } from '@ai-sdk/react'
 import { ArrowLeftIcon } from 'lucide-react'
@@ -51,10 +52,10 @@ export const MeetingChat = ({
       </div>
 
       <form onSubmit={handleSubmit}>
-        <input
-          className='fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 rounded shadow-xl'
+        <Textarea
+          className='fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 rounded-md shadow-xl'
           value={input}
-          placeholder='Say something...'
+          placeholder='Resumir, encontrar puntos claves, etc...'
           onChange={handleInputChange}
         />
       </form>

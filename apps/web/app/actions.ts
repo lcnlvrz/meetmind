@@ -2,6 +2,16 @@ import { and, count, eq, gte, ilike, like, lte, SQL } from 'drizzle-orm'
 import { db } from './db'
 import { meetingTable, participantTable } from 'db'
 import { MeetingsSearchParams } from './meetings/search-params'
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+
+const s3 = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+})
 
 const getMeetingFilters = ({
   date_from,
@@ -57,15 +67,28 @@ export type PaginateMeetingsResponseBody = Awaited<
 >
 
 export const retrieveMeeting = async ({ meetingId }: { meetingId: number }) => {
-  const results = await db
-    .select()
-    .from(meetingTable)
-    .where(eq(meetingTable.id, meetingId))
-    .limit(1)
+  const meeting = await db.query.meetingTable.findFirst({
+    where: eq(meetingTable.id, meetingId),
+    with: {
+      participants: true,
+    },
+  })
 
-  const [result] = results
+  if (!meeting) return
 
-  return result
+  const command = new GetObjectCommand({
+    Bucket: process.env.AWS_BUCKET_NAME!,
+    Key: meeting.filename,
+  })
+
+  const url = await getSignedUrl(s3, command, {
+    expiresIn: 60 * 60 * 24, // 1 day
+  })
+
+  return {
+    ...meeting,
+    videoUrl: url,
+  }
 }
 
 export type RetrieveMeetingResponseBody = NonNullable<

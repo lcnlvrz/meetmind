@@ -6,6 +6,8 @@ export const meetingTable = sqliteTable('meetings', {
   title: text('title').notNull(),
   summary: text('summary').notNull(),
 
+  filename: text('filename').notNull(),
+
   short_summary: text('short_summary').notNull(),
 
   transcription: text('transcription').notNull(),

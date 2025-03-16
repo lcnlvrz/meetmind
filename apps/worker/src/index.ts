@@ -94,6 +94,7 @@ export const handler = async (event: SQSEvent) => {
       const { title, short_summary } = await processMeeting({
         ...deps,
         videoPath,
+        key,
       })
 
       const end = performance.now()
@@ -146,8 +147,10 @@ export const processMeeting = async ({
   transcriber,
   google,
   db,
+  key,
 }: {
   videoPath: string
+  key: string
 } & ReturnType<typeof bootstrapDependencies>) =>
   await measureOp('processMeeting', async () => {
     const audioPath = path.join(TEMP_DIR, 'output.mp3')
@@ -198,6 +201,7 @@ export const processMeeting = async ({
         analysis,
         durationMs,
         transcription: transcriptionText,
+        key,
       })
     )
 
@@ -378,16 +382,19 @@ const saveMeeting = async (
     analysis,
     durationMs,
     transcription,
+    key,
   }: {
     analysis: Awaited<ReturnType<typeof digestTranscription>>
     durationMs: number
     transcription: string
+    key: string
   }
 ) => {
   const { meeting } = await db.transaction(async (tx) => {
     const [meeting] = await tx
       .insert(meetingTable)
       .values({
+        filename: key,
         title: analysis.title,
         summary: analysis.summary,
         short_summary: analysis.short_summary,

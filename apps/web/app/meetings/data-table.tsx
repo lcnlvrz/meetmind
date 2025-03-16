@@ -8,9 +8,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { PaginationDynamic } from '@/components/ui/pagination'
-import { msToMinutes } from '@/lib/utils'
+import { cn, msToMinutes } from '@/lib/utils'
+import { format, formatInTimeZone } from 'date-fns-tz'
 import { ColumnDef } from '@tanstack/react-table'
-import { MoreHorizontal } from 'lucide-react'
+import { MessageSquareText, MoreHorizontal, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { PaginateMeetingsResponseBody } from '../actions'
 import {
@@ -22,7 +23,7 @@ import { DatePickerWithRange } from '@/components/ui/date-range'
 import { Input } from '@/components/ui/input'
 //@ts-ignore
 import * as debounce from 'lodash.debounce'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import {
   Select,
   SelectContent,
@@ -31,8 +32,49 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 type Meeting = PaginateMeetingsResponseBody['data'][number]
+
+const ChatWithAIButton = () => {
+  const [isHovered, setIsHovered] = useState(false)
+
+  return (
+    <Button
+      size='sm'
+      className={cn(
+        'relative overflow-hidden group transition-all duration-300 px-3 py-3',
+        'bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700',
+        'text-white font-medium rounded-xl shadow-lg hover:shadow-xl',
+        'flex items-center gap-3'
+      )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <span className='relative z-10 flex items-center gap-2'>
+        <MessageSquareText className='w-5 h-5' />
+        <span>Chat with AI</span>
+        <Sparkles
+          className={cn(
+            'w-5 h-5 transition-all duration-500',
+            isHovered ? 'opacity-100 rotate-12' : 'opacity-70 rotate-0'
+          )}
+        />
+      </span>
+
+      {/* Animated background effect */}
+      <span className='absolute inset-0 w-full h-full bg-gradient-to-r from-purple-500/20 to-indigo-500/20 blur-xl transform scale-150 opacity-0 group-hover:opacity-100 transition-all duration-700'></span>
+
+      {/* Subtle pulse animation */}
+      <span
+        className={cn(
+          'absolute inset-0 bg-white/10 rounded-xl transform transition-all duration-700',
+          isHovered ? 'scale-105 opacity-0' : 'scale-100 opacity-0'
+        )}
+      ></span>
+    </Button>
+  )
+}
 
 export const MeetingsDataTable = ({
   data,
@@ -43,6 +85,12 @@ export const MeetingsDataTable = ({
     {
       header: 'Fecha',
       accessorKey: 'created_at',
+      accessorFn: (row) =>
+        formatInTimeZone(
+          new Date(row.created_at),
+          'America/Argentina/Buenos_Aires',
+          'dd/MM/yyyy HH:mm'
+        ),
     },
     {
       header: 'Duración',
@@ -51,16 +99,30 @@ export const MeetingsDataTable = ({
     {
       header: 'Titulo',
       accessorKey: 'title',
+      cell: ({ row }) => {
+        return (
+          <div className='max-w-56 flex flex-row flex-wrap'>
+            {row.original.title}
+          </div>
+        )
+      },
     },
     {
       header: 'Resumen',
       accessorKey: 'short_summary',
+      cell: ({ row }) => {
+        return (
+          <div className='max-w-56 flex flex-row flex-wrap'>
+            {row.original.short_summary}
+          </div>
+        )
+      },
     },
     {
       header: 'Participantes',
       cell: ({ row }) => {
         return (
-          <div>
+          <div className='flex flex-row flex-wrap gap-2'>
             {row.original.participants.map((participant) => {
               return <Badge key={participant.id}>{participant.name}</Badge>
             })}
@@ -72,16 +134,9 @@ export const MeetingsDataTable = ({
       id: 'actions',
       cell: ({ row }) => {
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger>
-              <MoreHorizontal className='h-4 w-4' />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <Link href={`/meetings/${row.original.id}`}>
-                <DropdownMenuItem>Q&A</DropdownMenuItem>
-              </Link>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Link href={`/meetings/${row.original.id}`}>
+            <ChatWithAIButton />
+          </Link>
         )
       },
     },
