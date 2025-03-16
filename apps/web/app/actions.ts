@@ -1,6 +1,6 @@
 import { and, count, eq, gte, ilike, like, lte, SQL } from 'drizzle-orm'
 import { db } from './db'
-import { meetingTable } from 'db'
+import { meetingTable, participantTable } from 'db'
 import { MeetingsSearchParams } from './meetings/search-params'
 
 const getMeetingFilters = ({
@@ -28,12 +28,14 @@ export const paginateMeetings = async ({
 
   const filters = getMeetingFilters({ date_from, date_to, search })
 
-  const result = await db
-    .select()
-    .from(meetingTable)
-    .where(filters)
-    .limit(limit)
-    .offset((page - 1) * limit)
+  const result = await db.query.meetingTable.findMany({
+    limit: limit,
+    offset: (page - 1) * limit,
+    with: {
+      participants: true,
+    },
+    where: filters,
+  })
 
   const [total] = await db
     .select({ count: count() })

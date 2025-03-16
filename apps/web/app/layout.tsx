@@ -2,11 +2,13 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
 import { NuqsAdapter } from 'nuqs/adapters/next'
+import { Globe } from 'lucide-react'
 
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
   variable: '--font-geist-sans',
 })
+
 const geistMono = localFont({
   src: './fonts/GeistMonoVF.woff',
   variable: '--font-geist-mono',
@@ -26,6 +28,22 @@ export default function RootLayout({
     <html lang='en'>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <NuqsAdapter>{children}</NuqsAdapter>
+        <footer className='pb-4 w-full flex items-center justify-center'>
+          <div className='flex flex-col text-center'>
+            <p className='text-sm text-gray-500 font-semibold'>
+              Made by{' '}
+              <a href='https://github.com/lcnlvrz' target='_blank'>
+                Luciano Alvarez
+              </a>{' '}
+            </p>
+            <div className='flex flex-row items-center space-x-1'>
+              <p className='text-xs text-gray-500'>
+                Deployed on raspberry pi 5 from Tucuman, Argentina
+              </p>
+              <Globe className='size-3 text-gray-500' />
+            </div>
+          </div>
+        </footer>
       </body>
     </html>
   )

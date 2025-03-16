@@ -5,6 +5,7 @@ import {
   DatabaseClient,
   InsertMeeting,
   meetingTable,
+  participantTable,
 } from 'db'
 import { generateObject } from 'ai'
 import type { S3Event, SQSEvent } from 'aws-lambda'
@@ -90,7 +91,7 @@ export const handler = async (event: SQSEvent) => {
         })
       )
 
-      const { title, summary } = await processMeeting({
+      const { title, short_summary } = await processMeeting({
         ...deps,
         videoPath,
       })
@@ -99,7 +100,7 @@ export const handler = async (event: SQSEvent) => {
 
       await bot.sendMessage(
         process.env.TELEGRAM_CHAT_ID!,
-        `Meeting ${key} processed successfully\nTitle: ${title}\nSummary: ${summary}\nTime taken: ${end - start}ms`
+        `Meeting ${key} processed successfully\nTitle: ${title}\nSummary: ${short_summary}\nTime taken: ${end - start}ms`
       )
 
       return {
@@ -169,25 +170,40 @@ export const processMeeting = async ({
     )
 
     const transcriptionText = transcriptionResults
-      .map((transcription) => transcription.text)
-      .join(' ')
+      .map((transcription, chunkIndex) => {
+        return transcription.segments
+          .map((segment, segmentIndex) => {
+            const globalStartMs = transcription.startMs + segment.start * 1000
+            const globalEndMs = transcription.startMs + segment.end * 1000
 
-    const { title, summary } = await measureOp('digestTranscription', () =>
+            const startTime = formatSRTTimestamp(globalStartMs)
+            const endTime = formatSRTTimestamp(globalEndMs)
+
+            const sequenceNumber = chunkIndex * 1000 + segmentIndex + 1
+
+            return `${sequenceNumber}\n${startTime} --> ${endTime}\n${segment.text}\n`
+          })
+          .join('\n')
+      })
+      .join('\n')
+
+    console.log('transcriptionText', transcriptionText)
+
+    const analysis = await measureOp('digestTranscription', () =>
       digestTranscription(transcriptionText, google)
     )
 
     await measureOp('saveMeeting', () =>
       saveMeeting(db, {
-        title,
-        summary,
+        analysis,
+        durationMs,
         transcription: transcriptionText,
-        duration_ms: durationMs,
       })
     )
 
     chunks.forEach((chunk) => fs.unlinkSync(chunk.path))
 
-    return { title, summary }
+    return analysis
   })
 
 export const bootstrapDependencies = () => {
@@ -308,7 +324,10 @@ const extractAudio = (
 const transcribeChunk = async (
   client: Groq,
   chunkPath: string
-): Promise<{ text: string; segments: any[] }> => {
+): Promise<{
+  text: string
+  segments: { start: number; end: number; text: string }[]
+}> => {
   const file = fs.createReadStream(chunkPath)
 
   const transcription = await client.audio.transcriptions.create({
@@ -328,8 +347,23 @@ const digestTranscription = async (
 ) => {
   const { object } = await generateObject({
     schema: z.object({
-      title: z.string(),
-      summary: z.string(),
+      title: z.string().describe('El titulo de la reunion'),
+      summary: z.string().describe('Un resumen mas extenso de la reunion'),
+      short_summary: z
+        .string()
+        .describe(
+          'Un resumen corto de la reunion con los key points. Que no supere los 255 caracteres'
+        ),
+      participants: z
+        .array(
+          z.object({
+            name: z.string().describe('El nombre del participante'),
+            role: z.string().describe('El rol del participante'),
+          })
+        )
+        .describe(
+          'Los participantes de la reunion. Deben ser los usuarios que formaron parte de la reunion. Evita agregar participantes que fueron mencionados unicamente'
+        ),
     }),
     model: llmProvider('gemini-2.0-flash-001'),
     prompt: `Sos un experto en resumir reuniones. Tienes muchos años de experiencia definiendo un titulo y resumen de una transcripción de reunion. Genera un titulo y resumen para la siguiente transcripción de reunion:\n ${transcription}`,
@@ -338,6 +372,52 @@ const digestTranscription = async (
   return object
 }
 
-const saveMeeting = async (db: DatabaseClient, meeting: InsertMeeting) => {
-  await db.insert(meetingTable).values(meeting)
+const saveMeeting = async (
+  db: DatabaseClient,
+  {
+    analysis,
+    durationMs,
+    transcription,
+  }: {
+    analysis: Awaited<ReturnType<typeof digestTranscription>>
+    durationMs: number
+    transcription: string
+  }
+) => {
+  const { meeting } = await db.transaction(async (tx) => {
+    const [meeting] = await tx
+      .insert(meetingTable)
+      .values({
+        title: analysis.title,
+        summary: analysis.summary,
+        short_summary: analysis.short_summary,
+        duration_ms: durationMs,
+        transcription,
+      })
+      .returning()
+
+    await tx.insert(participantTable).values(
+      analysis.participants.map((participant) => ({
+        name: participant.name,
+        role: participant.role,
+        meeting_id: meeting.id,
+      }))
+    )
+
+    return {
+      meeting,
+    }
+  })
+
+  console.log(`Meeting ${meeting.id} persisted successfully`)
+}
+
+const formatSRTTimestamp = (ms: number): string => {
+  const totalSeconds = Math.floor(ms / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const milliseconds = ms % 1000
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')},${String(milliseconds).padStart(3, '0')}`
 }

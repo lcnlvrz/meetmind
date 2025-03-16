@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/libsql'
 import { createClient } from '@libsql/client'
+import * as schema from 'db'
 
 export interface DatabaseClientOpts {
   url: string
@@ -12,7 +13,9 @@ export const createDatabaseClient = (opts: DatabaseClientOpts) => {
     authToken: opts.authToken,
   })
 
-  return drizzle(turso)
+  return drizzle(turso, {
+    schema,
+  })
 }
 
 export type DatabaseClient = Awaited<ReturnType<typeof createDatabaseClient>>

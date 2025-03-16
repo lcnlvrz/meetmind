@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 
 export const MeetingsDataTable = ({
   data,
@@ -52,7 +53,13 @@ export const MeetingsDataTable = ({
     },
     {
       header: 'Resumen',
-      accessorKey: 'summary',
+      accessorKey: 'short_summary',
+    },
+    {
+      header: 'Participantes',
+      cell: ({ row }) => {
+        return <Badge></Badge>
+      },
     },
     {
       id: 'actions',
