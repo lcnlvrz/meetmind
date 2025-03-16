@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Meeting not found' }, { status: 404 })
 
   const result = streamText({
-    model: google('gemini-1.5-flash'),
+    model: google('gemini-2.0-flash-001'),
     messages: parsedBody.data.messages,
     system: `
     You are a helpful assistant that can answer questions about the meeting.

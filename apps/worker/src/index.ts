@@ -22,6 +22,9 @@ const TEMP_DIR = '/tmp'
 const CHUNK_LENGTH_SEC = 600
 const OVERLAP_SEC = 10
 
+//14 minutes in ms
+const TIMEOUT_MS = 840000
+
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN!)
 
 const measureOp = async <T extends any>(
@@ -43,59 +46,98 @@ const measureOp = async <T extends any>(
   return result
 }
 
-export const handler = async (event: SQSEvent) => {
-  console.log('event', JSON.stringify(event, null, 4))
-
+const createTempDir = () => {
   try {
-    const start = performance.now()
-
-    const [record] = event.Records
-
-    console.log('record', JSON.stringify(record, null, 4))
-
-    const s3Event: S3Event = JSON.parse(record.body)
-
-    console.log('s3Event', JSON.stringify(s3Event, null, 4))
-
-    const bucket = s3Event.Records[0].s3.bucket.name
-    const key = decodeURIComponent(s3Event.Records[0].s3.object.key)
-
-    const videoPath = path.join(TEMP_DIR, 'input.mp4')
-
-    const deps = bootstrapDependencies()
-
-    await measureOp('downloadFile', () =>
-      downloadFromS3(deps.s3, {
-        bucket,
-        key,
-        filePath: videoPath,
-      })
-    )
-
-    const { title, summary } = await processMeeting({
-      ...deps,
-      videoPath,
-    })
-
-    const end = performance.now()
-
-    await bot.sendMessage(
-      process.env.TELEGRAM_CHAT_ID!,
-      `Meeting ${key} processed successfully\nTitle: ${title}\nSummary: ${summary}\nTime taken: ${end - start}ms`
-    )
-
-    return {
-      statusCode: 200,
-      body: 'Audio extraction completed successfully',
-    }
-  } catch (err) {
-    await bot.sendMessage(
-      process.env.TELEGRAM_CHAT_ID!,
-      `Error processing meeting: ${JSON.stringify(serializeError(err), null, 4)}`
-    )
-
-    throw err
+    // Ensure /tmp exists and is writable
+    fs.accessSync('/tmp', fs.constants.W_OK)
+    return fs.mkdtempSync(path.join('/tmp', 'meeting-'))
+  } catch (error) {
+    console.error('Error accessing /tmp directory:', error)
+    throw new Error('Cannot access temporary directory in Lambda environment')
   }
+}
+
+export const handler = async (event: SQSEvent) => {
+  const [record] = event.Records
+
+  console.log('record', JSON.stringify(record, null, 4))
+
+  const s3Event: S3Event = JSON.parse(record.body)
+
+  console.log('s3Event', JSON.stringify(s3Event, null, 4))
+
+  const bucket = s3Event.Records[0].s3.bucket.name
+  const key = decodeURIComponent(s3Event.Records[0].s3.object.key)
+
+  const handle = async () => {
+    let tempDir: string
+
+    try {
+      tempDir = createTempDir()
+      console.log(`Created temporary directory: ${tempDir}`)
+
+      const start = performance.now()
+
+      const videoPath = path.join(tempDir, 'input.mp4')
+
+      const deps = bootstrapDependencies()
+
+      await measureOp('downloadFile', () =>
+        downloadFromS3(deps.s3, {
+          bucket,
+          key,
+          filePath: videoPath,
+        })
+      )
+
+      const { title, summary } = await processMeeting({
+        ...deps,
+        videoPath,
+      })
+
+      const end = performance.now()
+
+      await bot.sendMessage(
+        process.env.TELEGRAM_CHAT_ID!,
+        `Meeting ${key} processed successfully\nTitle: ${title}\nSummary: ${summary}\nTime taken: ${end - start}ms`
+      )
+
+      return {
+        statusCode: 200,
+        body: 'Audio extraction completed successfully',
+      }
+    } catch (err) {
+      await bot.sendMessage(
+        process.env.TELEGRAM_CHAT_ID!,
+        `Error processing meeting: ${JSON.stringify(serializeError(err), null, 4)}`
+      )
+
+      throw err
+    } finally {
+      if (tempDir!) {
+        try {
+          fs.rmSync(tempDir, { recursive: true, force: true })
+          console.log(`Cleaned up temporary directory: ${tempDir}`)
+        } catch (cleanupError) {
+          console.error('Error cleaning up temp directory:', cleanupError)
+        }
+      }
+    }
+  }
+
+  const timeout = (): any =>
+    new Promise((_, reject) =>
+      setTimeout(async () => {
+        await bot.sendMessage(
+          process.env.TELEGRAM_CHAT_ID!,
+          `Could not process meeting ${key} before timeout: ${TIMEOUT_MS}ms`
+        )
+
+        reject()
+      }, TIMEOUT_MS)
+    )
+
+  return await Promise.race([handle(), timeout()])
 }
 
 export const processMeeting = async ({
@@ -107,7 +149,7 @@ export const processMeeting = async ({
   videoPath: string
 } & ReturnType<typeof bootstrapDependencies>) =>
   await measureOp('processMeeting', async () => {
-    const audioPath = path.join(TEMP_DIR, 'output.flac')
+    const audioPath = path.join(TEMP_DIR, 'output.mp3')
 
     const { durationMs, chunks } = await measureOp('extractAudio', () =>
       extractAudio(videoPath, audioPath)
@@ -118,7 +160,7 @@ export const processMeeting = async ({
     const transcriptionResults = await Promise.all(
       chunks.map((chunk, i) =>
         limit(() =>
-          measureOp(`transcribeChunk${i + 1}`, async () => {
+          measureOp(`transcribeChunk${i + 1} ${chunk.path}`, async () => {
             const result = await transcribeChunk(transcriber, chunk.path)
             return { ...result, startMs: chunk.startMs }
           })
@@ -200,8 +242,7 @@ const downloadFromS3 = async (
 const extractAudio = (
   inputPath: string,
   outputPath: string,
-  chunkLengthSec: number = CHUNK_LENGTH_SEC,
-  overlapSec: number = OVERLAP_SEC
+  chunkLengthSec: number = CHUNK_LENGTH_SEC
 ): Promise<{
   durationMs: number
   chunks: { path: string; startMs: number }[]
@@ -217,58 +258,49 @@ const extractAudio = (
         `Extracting audio from ${inputPath} - Duration: ${duration}ms`
       )
 
+      // Extract and segment audio in a single pass
+      const chunkBasePath = path.join(TEMP_DIR, 'chunk_%03d.mp3')
+
       ffmpeg(inputPath)
-        .toFormat('flac')
-        .audioCodec('flac')
-        .audioFrequency(16000)
-        .audioChannels(1)
+        .outputOptions([
+          '-vn', // Skip video
+          '-f',
+          'segment', // Use segmenter
+          '-segment_time',
+          chunkLengthSec.toString(),
+          '-reset_timestamps',
+          '1',
+          '-c:a',
+          'libmp3lame', // Use MP3 codec
+          '-q:a',
+          '4', // Quality setting (0-9, lower is better)
+          '-ar',
+          '16000', // 16kHz sample rate
+          '-ac',
+          '1', // Mono channel
+        ])
+        .output(chunkBasePath)
         .on('error', reject)
-        .on('end', async () => {
-          const fileSizeInBytes = fs.statSync(outputPath).size
-          const fileSizeInMB = (fileSizeInBytes / (1024 * 1024)).toFixed(2)
-          console.log(
-            `Audio file size: ${fileSizeInMB} MB. Duration: ${duration}ms`
-          )
+        .on('progress', (progress) => {
+          console.log(`Audio Processing Progress: ${progress.timemark}`)
+        })
+        .on('end', () => {
+          // Read created chunks
+          const chunkFiles = fs
+            .readdirSync(TEMP_DIR)
+            .filter((file) => file.startsWith('chunk_'))
+            .sort()
 
-          const chunkMs = chunkLengthSec * 1000
-          const overlapMs = overlapSec * 1000
-          const totalChunks = Math.ceil(duration / (chunkMs - overlapMs))
+          chunkFiles.forEach((file, index) => {
+            const startMs = index * chunkLengthSec * 1000
+            const chunkPath = path.join(TEMP_DIR, file)
+            chunks.push({ path: chunkPath, startMs })
+          })
 
-          console.log('Going to create', totalChunks, 'audio chunks')
-
-          const splitterLimit = pLimit(5)
-
-          await Promise.all(
-            Array.from({ length: totalChunks }).map((_, i) =>
-              splitterLimit(async () => {
-                const startMs = i * (chunkMs - overlapMs)
-                const chunkPath = path.join(TEMP_DIR, `chunk_${i}.flac`)
-                chunks.push({ path: chunkPath, startMs })
-
-                console.log('Creating chunk', i, 'of', totalChunks)
-
-                await new Promise<void>((resolve) =>
-                  ffmpeg(outputPath)
-                    .setStartTime(startMs / 1000)
-                    .setDuration(chunkLengthSec)
-                    .output(chunkPath)
-                    .audioCodec('flac')
-                    .audioFrequency(16000)
-                    .audioChannels(1)
-                    .on('end', () => {
-                      console.log('Chunk', i, 'of', totalChunks, 'created')
-                      resolve()
-                    })
-                    .on('error', reject)
-                    .run()
-                )
-              })
-            )
-          )
-
+          console.log(`Created ${chunks.length} chunks`)
           resolve({ durationMs: duration, chunks })
         })
-        .save(outputPath)
+        .run()
     })
   })
 }
@@ -299,7 +331,7 @@ const digestTranscription = async (
       title: z.string(),
       summary: z.string(),
     }),
-    model: llmProvider('gemini-1.5-flash'),
+    model: llmProvider('gemini-2.0-flash-001'),
     prompt: `Sos un experto en resumir reuniones. Tienes muchos años de experiencia definiendo un titulo y resumen de una transcripción de reunion. Genera un titulo y resumen para la siguiente transcripción de reunion:\n ${transcription}`,
   })
 

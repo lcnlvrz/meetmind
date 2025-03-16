@@ -12,6 +12,6 @@ test('should execute successfully', async () => {
 
   await processMeeting({
     ...deps,
-    videoPath: path.join(__dirname, '../test/data/meeting-short.webm'),
+    videoPath: path.join(__dirname, '../test/data/long-meeting.mkv'),
   })
 })
