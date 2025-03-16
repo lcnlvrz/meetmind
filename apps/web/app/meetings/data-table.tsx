@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { PaginationDynamic } from '@/components/ui/pagination'
 import { msToMinutes } from '@/lib/utils'
-import { Meeting } from 'db'
 import { ColumnDef } from '@tanstack/react-table'
 import { MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
@@ -32,6 +31,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+
+type Meeting = PaginateMeetingsResponseBody['data'][number]
 
 export const MeetingsDataTable = ({
   data,
@@ -58,7 +59,13 @@ export const MeetingsDataTable = ({
     {
       header: 'Participantes',
       cell: ({ row }) => {
-        return <Badge></Badge>
+        return (
+          <div>
+            {row.original.participants.map((participant) => {
+              return <Badge key={participant.id}>{participant.name}</Badge>
+            })}
+          </div>
+        )
       },
     },
     {

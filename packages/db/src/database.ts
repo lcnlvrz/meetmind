@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/libsql'
 import { createClient } from '@libsql/client'
-import * as schema from 'db'
+import * as schema from './schema'
 
 export interface DatabaseClientOpts {
   url: string
