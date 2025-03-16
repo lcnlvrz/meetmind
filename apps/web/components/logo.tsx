@@ -1,12 +1,13 @@
 import * as React from 'react'
 
-export const Logo = (props) => (
+export const Logo = ({ className }: { className?: string }) => (
   <svg
     xmlns='http://www.w3.org/2000/svg'
     xmlSpace='preserve'
     id='svg5'
     version='1.1'
     viewBox='0 0 170 70'
+    className={className}
   >
     <g id='layer1'>
       <path

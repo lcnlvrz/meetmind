@@ -13,7 +13,7 @@ import { format, formatInTimeZone } from 'date-fns-tz'
 import { ColumnDef } from '@tanstack/react-table'
 import { MessageSquareText, MoreHorizontal, Sparkles } from 'lucide-react'
 import Link from 'next/link'
-import { PaginateMeetingsResponseBody } from '../actions'
+import { PaginateMeetingsResponseBody } from '../../../lib/server/actions'
 import {
   meetingSearchParamsParsers,
   MeetingsSearchParams,
@@ -134,7 +134,7 @@ export const MeetingsDataTable = ({
       id: 'actions',
       cell: ({ row }) => {
         return (
-          <Link href={`/meetings/${row.original.id}`}>
+          <Link href={`/meeting/${row.original.id}`}>
             <ChatWithAIButton />
           </Link>
         )

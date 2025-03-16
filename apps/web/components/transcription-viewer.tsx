@@ -66,7 +66,7 @@ export const TranscriptionViewer = ({
       {subtitles.map((subtitle) => (
         <div key={subtitle.id} className='pb-3 border-b last:border-b-0'>
           <div className='flex items-center gap-2 mb-1'>
-            <span className='text-xs font-mono bg-muted px-2 py-1 rounded'>
+            <span className='text-xs font-mono bg-muted dark:bg-slate-800 px-2 py-1 rounded'>
               {formatTime(subtitle.startTime)} → {formatTime(subtitle.endTime)}
             </span>
             <span className='text-xs text-muted-foreground'>

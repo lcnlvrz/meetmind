@@ -9,7 +9,7 @@ const nextConfig = {
   redirects: async () => [
     {
       source: '/',
-      destination: '/meetings',
+      destination: '/dashboard/meetings',
       permanent: false,
     },
   ],

@@ -1,6 +1,8 @@
-import { retrieveMeeting } from '@/app/actions'
+import { auth } from '@/auth'
+import { retrieveMeeting } from '@/lib/server/actions'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { streamText } from 'ai'
+import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -13,6 +15,7 @@ export const maxDuration = 30
 const chatMessageRequestBody = z.object({
   meetingId: z.coerce.number().int().positive(),
   messages: z.array(z.any()),
+  token: z.string().nullish(),
 })
 
 export type ChatMessageRequestBody = z.infer<typeof chatMessageRequestBody>
@@ -22,11 +25,21 @@ export async function POST(req: Request) {
 
   const parsedBody = chatMessageRequestBody.safeParse(body)
 
+  console.log('parsedBody', parsedBody)
+
   if (!parsedBody.success)
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
 
   const meeting = await retrieveMeeting({
     meetingId: parsedBody.data.meetingId,
+    token: parsedBody.data.token,
+    ...(!parsedBody.data.token
+      ? {
+          session: await auth.api.getSession({
+            headers: await headers(),
+          }),
+        }
+      : {}),
   })
 
   if (!meeting)

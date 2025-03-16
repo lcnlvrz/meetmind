@@ -4,6 +4,7 @@ import './globals.css'
 import { NuqsAdapter } from 'nuqs/adapters/next'
 import { Globe } from 'lucide-react'
 import { ThemeProvider } from '@/components/ui/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
@@ -35,6 +36,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <NuqsAdapter>{children}</NuqsAdapter>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
