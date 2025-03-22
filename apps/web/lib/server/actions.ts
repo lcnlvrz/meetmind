@@ -9,6 +9,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { auth } from '@/auth'
 import { headers } from 'next/headers'
 import crypto from 'crypto'
+import { generateObject } from 'ai'
+import { z } from 'zod'
+import { googleLLMProvider, llmModel } from '@/app/api/chat/route'
 
 const generateToken = (length = 64) =>
   crypto.randomBytes(length).toString('hex')
@@ -25,15 +28,22 @@ const getMeetingFilters = ({
   date_from,
   date_to,
   search,
-}: Pick<MeetingsSearchParams, 'date_from' | 'date_to' | 'search'>) => {
+  isSemanticSearch,
+}: Pick<MeetingsSearchParams, 'date_from' | 'date_to' | 'search'> & {
+  isSemanticSearch: boolean
+}) => {
   return and(
     date_from
       ? gte(meetingTable.created_at, date_from.toISOString())
       : undefined,
     date_to ? lte(meetingTable.created_at, date_to.toISOString()) : undefined,
-    search ? like(meetingTable.transcription, `%${search}%`) : undefined
+    search && !isSemanticSearch
+      ? like(meetingTable.transcription, `%${search}%`)
+      : undefined
   )
 }
+
+const SEMANTIC_SEARCH_ITEMS_LIMIT = 250
 
 export const paginateMeetings = async ({
   page,
@@ -41,6 +51,7 @@ export const paginateMeetings = async ({
   date_from,
   date_to,
   search,
+  semantic_search_enabled,
 }: MeetingsSearchParams) => {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -48,16 +59,108 @@ export const paginateMeetings = async ({
 
   if (!session) return
 
-  const filters = getMeetingFilters({ date_from, date_to, search })
+  const mode = semantic_search_enabled && !!search ? 'semantic' : 'normal'
+
+  const isSemanticSearch = mode === 'semantic'
+
+  const paginationParams = {
+    limit: isSemanticSearch ? SEMANTIC_SEARCH_ITEMS_LIMIT : limit,
+    offset: isSemanticSearch ? 0 : (page - 1) * limit,
+    page: isSemanticSearch ? 1 : page,
+  }
+
+  const filters = getMeetingFilters({
+    date_from,
+    date_to,
+    search,
+    isSemanticSearch,
+  })
 
   const result = await db.query.meetingTable.findMany({
-    limit: limit,
-    offset: (page - 1) * limit,
+    columns: {
+      id: true,
+      summary: true,
+      title: true,
+      filename: true,
+      created_at: true,
+      duration_ms: true,
+    },
+    limit: paginationParams.limit,
+    offset: paginationParams.offset,
     with: {
       participants: true,
     },
     where: filters,
   })
+
+  if (isSemanticSearch) {
+    const prompt = `
+      You are a super intelligent assistant that can search through the title and summary of a list of meetings and return the most relevant results performing a semantic and meaningful search.
+  
+      The meetings are:
+  
+      ${JSON.stringify(
+        result.map((meeting) => ({
+          id: meeting.id,
+          title: meeting.title,
+          summary: meeting.summary,
+          participants: meeting.participants,
+        }))
+      )}
+  
+      The search query is: ${search}
+  
+      Return up to 5 results ordered by relevance. Don't try to make up results, only return the ones that are most relevant.
+  
+      If there are no relevant results, return an empty array in semantic_search_results array list
+      `
+
+    const { object: semanticSearchResult, usage } = await generateObject({
+      model: llmModel,
+      schema: z.object({
+        semantic_search_results: z.array(
+          z.object({
+            id: z.number(),
+            match_reason: z.string(),
+          })
+        ),
+      }),
+      prompt,
+    })
+
+    console.log(
+      JSON.stringify(
+        {
+          prompt,
+          usage,
+          search,
+          candidates_count: result.length,
+        },
+        null,
+        2
+      ),
+      'Sematic search usage'
+    )
+
+    const hydratedMatches = semanticSearchResult.semantic_search_results
+      .map((hit) => {
+        const meeting = result.find((m) => m.id === hit.id)
+
+        if (!meeting) return null
+
+        return meeting
+      })
+      .filter(Boolean)
+
+    return {
+      data: hydratedMatches,
+      metadata: {
+        total: hydratedMatches.length,
+        page: paginationParams.page,
+        limit: paginationParams.limit,
+      },
+    }
+  }
 
   const [total] = await db
     .select({ count: count() })

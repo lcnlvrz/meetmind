@@ -11,9 +11,24 @@ import { PaginationDynamic } from '@/components/ui/pagination'
 import { cn, msToMinutes } from '@/lib/utils'
 import { format, formatInTimeZone } from 'date-fns-tz'
 import { ColumnDef } from '@tanstack/react-table'
-import { MessageSquareText, MoreHorizontal, Sparkles } from 'lucide-react'
+import {
+  Maximize2,
+  MessageSquareText,
+  MoreHorizontal,
+  Sparkles,
+} from 'lucide-react'
 import Link from 'next/link'
 import { PaginateMeetingsResponseBody } from '../../../lib/server/actions'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+
 import {
   meetingSearchParamsParsers,
   MeetingsSearchParams,
@@ -23,7 +38,7 @@ import { DatePickerWithRange } from '@/components/ui/date-range'
 import { Input } from '@/components/ui/input'
 //@ts-ignore
 import * as debounce from 'lodash.debounce'
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import {
   Select,
   SelectContent,
@@ -33,6 +48,14 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Toggle } from '@/components/ui/toggle'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { Textarea } from '@/components/ui/textarea'
 
 type Meeting = PaginateMeetingsResponseBody['data'][number]
 
@@ -45,7 +68,7 @@ const ChatWithAIButton = () => {
       className={cn(
         'relative overflow-hidden group transition-all duration-300 px-3 py-3',
         'bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700',
-        'text-white font-medium rounded-xl shadow-lg hover:shadow-xl',
+        'text-white font-medium rounded-md shadow-lg hover:shadow-xl',
         'flex items-center gap-3'
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -73,6 +96,62 @@ const ChatWithAIButton = () => {
         )}
       ></span>
     </Button>
+  )
+}
+
+const MaximizeInputSearchButton = ({
+  filters,
+  setFilters,
+}: {
+  filters: MeetingsSearchParams
+  setFilters: React.Dispatch<React.SetStateAction<MeetingsSearchParams>>
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const [search, setSearch] = useState(filters.search || '')
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button className='h-8 px-2' size='sm' variant={'ghost'}>
+                <Maximize2 className='size-2' />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Maximize</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Extended Search</DialogTitle>
+        </DialogHeader>
+        <Textarea
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          defaultValue={filters.search || ''}
+          placeholder='What was that meeting about..?'
+        />
+        <DialogFooter>
+          <Button
+            onClick={() => {
+              setFilters((prev) => ({
+                ...prev,
+                search,
+              }))
+
+              setIsOpen(false)
+            }}
+          >
+            Search
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -142,8 +221,11 @@ export const MeetingsDataTable = ({
     },
   ]
 
+  const [isLoading, startTransition] = useTransition()
+
   const [filters, setFilters] = useQueryStates(meetingSearchParamsParsers, {
     shallow: false,
+    startTransition,
   })
 
   const handleSearch = useCallback(
@@ -156,15 +238,52 @@ export const MeetingsDataTable = ({
     []
   )
 
+  console.log('isLoading?', isLoading)
+
   return (
     <div className='space-y-4'>
       <div className='flex flex-row items-center justify-between'>
         <div className='flex flex-row items-center space-x-2'>
-          <Input
-            placeholder='Buscar...'
-            defaultValue={filters.search || ''}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
+          <div className='relative'>
+            <Input
+              className='w-64'
+              placeholder='Buscar...'
+              value={filters.search || ''}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+            <div className='absolute right-1 top-[2px]'>
+              <div>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Toggle
+                        defaultChecked={filters.semantic_search_enabled}
+                        onClick={(ev) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            semantic_search_enabled:
+                              !prev.semantic_search_enabled,
+                          }))
+                        }
+                        size='sm'
+                      >
+                        <Sparkles />
+                      </Toggle>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Semantic Search</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <MaximizeInputSearchButton
+                  filters={filters}
+                  setFilters={setFilters}
+                />
+              </div>
+            </div>
+          </div>
+
           <DatePickerWithRange
             defaultValue={{
               from: filters.date_from ? new Date(filters.date_from) : undefined,
@@ -180,26 +299,28 @@ export const MeetingsDataTable = ({
           />
         </div>
 
-        <Select
-          defaultValue={filters.limit.toString()}
-          onValueChange={(value) =>
-            setFilters((prev) => ({
-              ...prev,
-              limit: parseInt(value),
-            }))
-          }
-        >
-          <SelectTrigger className='w-[180px]'>
-            <SelectValue placeholder='Items' />
-          </SelectTrigger>
-          <SelectContent>
-            {[10, 20, 30].map((limit) => (
-              <SelectItem key={limit} value={limit.toString()}>
-                {limit}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className='flex flex-row items-center space-x-2'>
+          <Select
+            defaultValue={filters.limit.toString()}
+            onValueChange={(value) =>
+              setFilters((prev) => ({
+                ...prev,
+                limit: parseInt(value),
+              }))
+            }
+          >
+            <SelectTrigger className='w-[180px]'>
+              <SelectValue placeholder='Items' />
+            </SelectTrigger>
+            <SelectContent>
+              {[10, 20, 30].map((limit) => (
+                <SelectItem key={limit} value={limit.toString()}>
+                  {limit}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <DataTable columns={columns} data={data.data} />

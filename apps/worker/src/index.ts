@@ -325,6 +325,49 @@ const extractAudio = (
   })
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const transcribeChunkWithRetry = async (
+  client: Groq,
+  chunkPath: string,
+  maxRetries = 3,
+  initialDelayMs = 1000
+): Promise<{
+  text: string
+  segments: { start: number; end: number; text: string }[]
+}> => {
+  let lastError: any
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const file = fs.createReadStream(chunkPath)
+
+      const transcription = await client.audio.transcriptions.create({
+        file,
+        model: 'whisper-large-v3-turbo',
+        response_format: 'verbose_json',
+        temperature: 0,
+      })
+
+      //@ts-ignore
+      return transcription
+    } catch (error) {
+      lastError = error
+      if (attempt < maxRetries - 1) {
+        const delayMs = initialDelayMs * Math.pow(2, attempt)
+        console.log(
+          `Transcription attempt ${attempt + 1} failed, retrying in ${delayMs}ms...`
+        )
+        await sleep(delayMs)
+      }
+    }
+  }
+
+  throw new Error(
+    `Failed to transcribe after ${maxRetries} attempts. Last error: ${lastError}`
+  )
+}
+
 const transcribeChunk = async (
   client: Groq,
   chunkPath: string
@@ -332,17 +375,7 @@ const transcribeChunk = async (
   text: string
   segments: { start: number; end: number; text: string }[]
 }> => {
-  const file = fs.createReadStream(chunkPath)
-
-  const transcription = await client.audio.transcriptions.create({
-    file,
-    model: 'whisper-large-v3-turbo',
-    response_format: 'verbose_json',
-    temperature: 0,
-  })
-
-  //@ts-ignore
-  return transcription
+  return transcribeChunkWithRetry(client, chunkPath)
 }
 
 const digestTranscription = async (
