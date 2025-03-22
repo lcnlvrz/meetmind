@@ -6,9 +6,11 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
-const google = createGoogleGenerativeAI({
+export const googleLLMProvider = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_API_KEY,
 })
+
+export const llmModel = googleLLMProvider('gemini-2.0-flash-001')
 
 export const maxDuration = 30
 
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Meeting not found' }, { status: 404 })
 
   const result = streamText({
-    model: google('gemini-2.0-flash-001'),
+    model: llmModel,
     messages: parsedBody.data.messages,
     system: `
     You are a helpful assistant that can answer questions about the meeting.

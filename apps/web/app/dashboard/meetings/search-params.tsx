@@ -4,6 +4,7 @@ import {
   parseAsIsoDateTime,
   inferParserType,
   parseAsString,
+  parseAsBoolean,
 } from 'nuqs/server'
 
 export const meetingSearchParamsParsers = {
@@ -12,6 +13,7 @@ export const meetingSearchParamsParsers = {
   date_from: parseAsIsoDateTime,
   date_to: parseAsIsoDateTime,
   search: parseAsString,
+  semantic_search_enabled: parseAsBoolean.withDefault(false),
 }
 
 export const loadSearchParams = createLoader(meetingSearchParamsParsers)
