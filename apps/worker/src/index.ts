@@ -9,6 +9,7 @@ import {
 } from 'db'
 import { generateObject } from 'ai'
 import type { S3Event, SQSEvent } from 'aws-lambda'
+import { eq } from 'drizzle-orm'
 import ffmpeg from 'fluent-ffmpeg'
 import * as fs from 'fs'
 import Groq from 'groq-sdk'
@@ -82,6 +83,17 @@ export const handler = async (event: SQSEvent) => {
       const videoPath = path.join(tempDir, 'input.mp4')
 
       const deps = bootstrapDependencies()
+
+      const existentMeeting = await deps.db.query.meetingTable.findFirst({
+        //@ts-ignore
+        where: eq(meetingTable.filename, key),
+      })
+
+      if (existentMeeting) {
+        console.log(`Meeting ${key} already exists. Skipping...`)
+
+        return
+      }
 
       await measureOp('downloadFile', () =>
         downloadFromS3(deps.s3, {
