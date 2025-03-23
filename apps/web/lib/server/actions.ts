@@ -128,20 +128,6 @@ export const paginateMeetings = async ({
       prompt,
     })
 
-    console.log(
-      JSON.stringify(
-        {
-          prompt,
-          usage,
-          search,
-          candidates_count: result.length,
-        },
-        null,
-        2
-      ),
-      'Sematic search usage'
-    )
-
     const hydratedMatches = semanticSearchResult.semantic_search_results
       .map((hit) => {
         const meeting = result.find((m) => m.id === hit.id)
