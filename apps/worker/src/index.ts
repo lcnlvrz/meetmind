@@ -18,6 +18,7 @@ import { z } from 'zod'
 import pLimit from 'p-limit'
 import TelegramBot from 'node-telegram-bot-api'
 import { serializeError } from 'serialize-error'
+import { Redis } from '@upstash/redis'
 
 const TEMP_DIR = '/tmp'
 
@@ -59,6 +60,11 @@ const createTempDir = () => {
   }
 }
 
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_URL!,
+  token: process.env.UPSTASH_REDIS_TOKEN!,
+})
+
 export const handler = async (event: SQSEvent) => {
   const [record] = event.Records
 
@@ -70,6 +76,21 @@ export const handler = async (event: SQSEvent) => {
 
   const bucket = s3Event.Records[0].s3.bucket.name
   const key = decodeURIComponent(s3Event.Records[0].s3.object.key)
+
+  const mutexKey = `meeting:${key}`
+
+  //15 minutes in seconds
+  const acquireResult = await redis.set(mutexKey, 'true', { ex: 900, nx: true })
+
+  if (acquireResult !== 'OK') {
+    console.log(
+      `Acquire mutex for meeting ${key} failed. Result: ${acquireResult}`
+    )
+
+    return
+  }
+
+  console.log(`Won mutex for meeting ${key}`)
 
   const handle = async () => {
     let tempDir: string
@@ -136,6 +157,8 @@ export const handler = async (event: SQSEvent) => {
           console.error('Error cleaning up temp directory:', cleanupError)
         }
       }
+
+      await redis.del(mutexKey)
     }
   }
 
@@ -146,6 +169,8 @@ export const handler = async (event: SQSEvent) => {
           process.env.TELEGRAM_CHAT_ID!,
           `Could not process meeting ${key} before timeout: ${TIMEOUT_MS}ms`
         )
+
+        await redis.del(mutexKey)
 
         reject()
       }, TIMEOUT_MS)

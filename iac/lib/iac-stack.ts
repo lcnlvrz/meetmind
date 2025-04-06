@@ -47,6 +47,8 @@ export class IacStack extends cdk.Stack {
         GOOGLE_API_KEY: process.env.GOOGLE_API_KEY!,
         TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN!,
         TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID!,
+        UPSTASH_REDIS_URL: process.env.UPSTASH_REDIS_URL!,
+        UPSTASH_REDIS_TOKEN: process.env.UPSTASH_REDIS_TOKEN!,
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
       memorySize: 3008,
