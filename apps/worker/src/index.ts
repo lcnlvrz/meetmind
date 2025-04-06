@@ -79,14 +79,6 @@ export const handler = async (event: SQSEvent) => {
 
   const mutexKey = `meeting:${key}`
 
-  const isMeetingBeingProcessed = await redis.get(mutexKey)
-
-  if (isMeetingBeingProcessed) {
-    console.log(`Meeting ${key} is already being processed. Skipping...`)
-
-    return
-  }
-
   //15 minutes in seconds
   const acquireResult = await redis.set(mutexKey, 'true', { ex: 900, nx: true })
 
