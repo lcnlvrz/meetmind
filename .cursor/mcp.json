@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "meetmind": {
+      "command": "/home/lcnlvrz/meetmind/apps/mcp-server/run.sh",
+      "args": ["/home/lcnlvrz/meetmind/apps/mcp-server/dist/index.js"]
+    }
+  }
+}
