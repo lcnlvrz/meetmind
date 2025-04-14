@@ -24,8 +24,6 @@ COPY --from=builder /app/out/package-lock.json ./package-lock.json
 RUN npm i
 COPY --from=builder /app/out/full/ .
 
-RUN cp ./apps/web/.env.development ./apps/web/.env
-
 RUN cd apps/web && touch .env
 RUN cd apps/web && echo "TURSO_DATABASE_URL=${TURSO_DATABASE_URL}" >> .env
 RUN cd apps/web && echo "TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}" >> .env
