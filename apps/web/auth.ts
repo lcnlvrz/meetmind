@@ -6,6 +6,7 @@ import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 
 export const auth = betterAuth({
+  trustedOrigins: ['https://meetmind.lucianoalvarez.dev'],
   secret: process.env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
     provider: 'sqlite',
